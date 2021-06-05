@@ -47,7 +47,6 @@ const (
 	name                              = "azure-cns"
 	pluginName                        = "azure-vnet"
 	defaultCNINetworkConfigFileName   = "10-azure.conflist"
-	configFileName                    = "config.json"
 	dncApiVersion                     = "?api-version=2018-03-01"
 	poolIPAMRefreshRateInMilliseconds = 1000
 
@@ -289,7 +288,7 @@ func registerNode(httpc *http.Client, httpRestService cns.HTTPService, dncEP, in
 		}
 		time.Sleep(acn.FiveSeconds)
 	}
-	return fmt.Errorf("[Azure CNS] Failed to register node %s after maximum reties for an hour with Infrastructure Network: %s PrivateEndpoint: %s",
+	return fmt.Errorf("failed to register node %s after maximum retries for an hour with Infrastructure Network: %s PrivateEndpoint: %s",
 		nodeID, infraVnet, dncEP)
 }
 
@@ -303,10 +302,9 @@ func sendRegisterNodeRequest(
 	var (
 		body     bytes.Buffer
 		response *http.Response
-		err      = fmt.Errorf("")
 	)
 
-	err = json.NewEncoder(&body).Encode(nodeRegisterRequest)
+	err := json.NewEncoder(&body).Encode(nodeRegisterRequest)
 	if err != nil {
 		log.Errorf("[Azure CNS] Failed to register node while encoding json failed with non-retriable err %v", err)
 		return false, err
@@ -320,8 +318,8 @@ func sendRegisterNodeRequest(
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusCreated {
-		err = fmt.Errorf("[Azure CNS] Failed to register node, DNC replied with http status code %s", strconv.Itoa(response.StatusCode))
-		logger.Errorf(err.Error())
+		err = fmt.Errorf("failed to register node, DNC replied with http status code %s", strconv.Itoa(response.StatusCode))
+		logger.Errorf("[Azure CNS] %s", err.Error())
 		return false, nil
 	}
 
@@ -626,7 +624,7 @@ func main() {
 
 	// Relay these incoming signals to OS signal channel.
 	osSignalChannel := make(chan os.Signal, 1)
-	signal.Notify(osSignalChannel, os.Interrupt, os.Kill, syscall.SIGTERM)
+	signal.Notify(osSignalChannel, os.Interrupt, syscall.SIGTERM)
 
 	// Wait until receiving a signal.
 	select {
@@ -846,8 +844,6 @@ func InitializeCRDState(httpRestService cns.HTTPService, cnsconfig configuration
 			<-time.NewTicker(cnsconfig.SyncHostNCVersionIntervalMs * time.Millisecond).C
 			httpRestServiceImplementation.SyncHostNCVersion(rootCxt, cnsconfig.ChannelMode, cnsconfig.SyncHostNCTimeoutMs)
 		}
-
-		logger.Printf("[Azure CNS] Exiting SyncHostNCVersion")
 	}()
 
 	return nil

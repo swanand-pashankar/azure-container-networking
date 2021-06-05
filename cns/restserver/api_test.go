@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"github.com/Azure/azure-container-networking/store"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -22,6 +21,7 @@ import (
 	"github.com/Azure/azure-container-networking/cns/logger"
 	"github.com/Azure/azure-container-networking/cns/nmagentclient"
 	acncommon "github.com/Azure/azure-container-networking/common"
+	"github.com/Azure/azure-container-networking/store"
 )
 
 const (
@@ -59,21 +59,26 @@ var (
 	mux               *http.ServeMux
 	hostQueryResponse = xmlDocument{
 		XMLName: xml.Name{Local: "Interfaces"},
-		Interface: []Interface{Interface{
-			XMLName:    xml.Name{Local: "Interface"},
-			MacAddress: "*",
-			IsPrimary:  true,
-			IPSubnet: []IPSubnet{
-				IPSubnet{XMLName: xml.Name{Local: "IPSubnet"},
-					Prefix: "10.0.0.0/16",
-					IPAddress: []IPAddress{
-						IPAddress{
-							XMLName:   xml.Name{Local: "IPAddress"},
-							Address:   "10.0.0.4",
-							IsPrimary: true},
-					}},
+		Interface: []Interface{
+			{
+				XMLName:    xml.Name{Local: "Interface"},
+				MacAddress: "*",
+				IsPrimary:  true,
+				IPSubnet: []IPSubnet{
+					{
+						XMLName: xml.Name{Local: "IPSubnet"},
+						Prefix:  "10.0.0.0/16",
+						IPAddress: []IPAddress{
+							{
+								XMLName:   xml.Name{Local: "IPAddress"},
+								Address:   "10.0.0.4",
+								IsPrimary: true,
+							},
+						},
+					},
+				},
 			},
-		}},
+		},
 	}
 )
 

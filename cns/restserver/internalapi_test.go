@@ -164,7 +164,7 @@ func TestPendingIPsGotUpdatedWhenSyncHostNCVersion(t *testing.T) {
 	if len(receivedSecondaryIPConfigs) != 1 {
 		t.Errorf("Unexpected receivedSecondaryIPConfigs length %d, expeted length is 1", len(receivedSecondaryIPConfigs))
 	}
-	for i, _ := range receivedSecondaryIPConfigs {
+	for i := range receivedSecondaryIPConfigs {
 		podIPConfigState := svc.PodIPConfigState[i]
 		if podIPConfigState.State != cns.PendingProgramming {
 			t.Errorf("Unexpected State %s, expeted State is %s, received %s, IP address is %s", podIPConfigState.State, cns.PendingProgramming, podIPConfigState.State, podIPConfigState.IPAddress)
@@ -177,7 +177,7 @@ func TestPendingIPsGotUpdatedWhenSyncHostNCVersion(t *testing.T) {
 	if len(receivedSecondaryIPConfigs) != 1 {
 		t.Errorf("Unexpected receivedSecondaryIPConfigs length %d, expeted length is 1", len(receivedSecondaryIPConfigs))
 	}
-	for i, _ := range receivedSecondaryIPConfigs {
+	for i := range receivedSecondaryIPConfigs {
 		podIPConfigState := svc.PodIPConfigState[i]
 		if podIPConfigState.State != cns.Available {
 			t.Errorf("Unexpected State %s, expeted State is %s, received %s, IP address is %s", podIPConfigState.State, cns.Available, podIPConfigState.State, podIPConfigState.IPAddress)
