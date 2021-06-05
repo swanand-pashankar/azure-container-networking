@@ -60,7 +60,7 @@ func newSecondaryIPConfig(ipAddress string, ncVersion int) cns.SecondaryIPConfig
 	}
 }
 
-func NewPodState(ipaddress string, prefixLength uint8, id, ncid, state string, ncVersion int) cns.IPConfigurationStatus {
+func NewPodState(ipaddress string, prefixLength uint8, id, ncid string, state cns.IPConfigState, ncVersion int) cns.IPConfigurationStatus {
 	ipconfig := newSecondaryIPConfig(ipaddress, ncVersion)
 
 	return cns.IPConfigurationStatus{
@@ -124,7 +124,7 @@ func requestIpAddressAndGetState(t *testing.T, req cns.IPConfigRequest) (cns.IPC
 	return ipState, err
 }
 
-func NewPodStateWithOrchestratorContext(ipaddress, id, ncid, state string, prefixLength uint8, ncVersion int, orchestratorContext cns.KubernetesPodInfo) (cns.IPConfigurationStatus, error) {
+func NewPodStateWithOrchestratorContext(ipaddress, id, ncid string, state cns.IPConfigState, prefixLength uint8, ncVersion int, orchestratorContext cns.KubernetesPodInfo) (cns.IPConfigurationStatus, error) {
 	ipconfig := newSecondaryIPConfig(ipaddress, ncVersion)
 	b, err := json.Marshal(orchestratorContext)
 	return cns.IPConfigurationStatus{
