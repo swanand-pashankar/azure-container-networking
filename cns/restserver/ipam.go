@@ -503,28 +503,28 @@ func (service *HTTPRestService) AllocateDesiredIPConfig(podInfo cns.KubernetesPo
 }
 
 func (service *HTTPRestService) AllocateAnyAvailableIPConfig(podInfo cns.KubernetesPodInfo, orchestratorContext json.RawMessage) (cns.PodIpInfo, error) {
-	var podIpInfo cns.PodIpInfo
-
 	service.Lock()
 	defer service.Unlock()
 
+	var podIpInfo cns.PodIpInfo
 	for _, ipState := range service.PodIPConfigState {
-		if ipState.State == cns.Available {
-			_, err := service.setIPConfigAsAllocated(ipState, podInfo, orchestratorContext)
-			if err != nil {
-				return podIpInfo, err
-			}
-
-			err = service.populateIpConfigInfoUntransacted(ipState, &podIpInfo)
-			if err != nil {
-				return podIpInfo, err
-			}
-
+		if ipState.State != cns.Available {
+			continue
+		}
+		_, err := service.setIPConfigAsAllocated(ipState, podInfo, orchestratorContext)
+		if err != nil {
 			return podIpInfo, err
 		}
+
+		err = service.populateIpConfigInfoUntransacted(ipState, &podIpInfo)
+		if err != nil {
+			return podIpInfo, err
+		}
+
+		return podIpInfo, err
 	}
 
-	return podIpInfo, fmt.Errorf("No more free IP's available, waiting on Azure CNS to allocated more IP's...")
+	return podIpInfo, fmt.Errorf("no more free IPs available, waiting on Azure CNS to allocated more IP's...")
 }
 
 // If IPConfig is already allocated for pod, it returns that else it returns one of the available ipconfigs.
