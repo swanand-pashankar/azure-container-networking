@@ -56,46 +56,33 @@ func (service *HTTPRestService) requestIPConfigHandler(w http.ResponseWriter, r 
 }
 
 func (service *HTTPRestService) releaseIPConfigHandler(w http.ResponseWriter, r *http.Request) {
-	var (
-		req           cns.IPConfigRequest
-		statusCode    int
-		returnMessage string
-		err           error
-	)
-
-	statusCode = UnexpectedError
-	operationName := "releaseIPConfigHandler"
+	req := cns.IPConfigRequest{}
+	resp := cns.Response{}
+	var err error
 
 	defer func() {
-		resp := cns.Response{}
-
-		if err != nil {
-			resp.ReturnCode = statusCode
-			resp.Message = returnMessage
-		}
-
 		err = service.Listener.Encode(w, &resp)
 		logger.ResponseEx(service.Name, req, resp, resp.ReturnCode, ReturnCodeToString(resp.ReturnCode), err)
 	}()
 
 	err = service.Listener.Decode(w, r, &req)
-	logger.Request(service.Name+operationName, req, err)
+	logger.Request(service.Name+"releaseIPConfigHandler", req, err)
 	if err != nil {
-		returnMessage = err.Error()
-		logger.Errorf("releaseIPConfigHandler decode failed becase %v, release IP config info %s",
-			returnMessage, req)
+		resp.ReturnCode = UnexpectedError
+		resp.Message = err.Error()
+		logger.Errorf("releaseIPConfigHandler decode failed becase %v, release IP config info %s", resp.Message, req)
 		return
 	}
 
-	podInfo, statusCode, returnMessage := service.validateIpConfigRequest(req)
+	var podInfo cns.KubernetesPodInfo
+	podInfo, resp.ReturnCode, resp.Message = service.validateIpConfigRequest(req)
 
 	if err = service.releaseIPConfig(podInfo); err != nil {
-		statusCode = NotFound
-		returnMessage = err.Error()
-		logger.Errorf("releaseIPConfigHandler releaseIPConfig failed because %v, release IP config info %s", returnMessage, req)
+		resp.ReturnCode = NotFound
+		resp.Message = err.Error()
+		logger.Errorf("releaseIPConfigHandler releaseIPConfig failed because %v, release IP config info %s", resp.Message, req)
 		return
 	}
-	return
 }
 
 // MarkIPAsPendingRelease will set the IPs which are in PendingProgramming or Available to PendingRelease state
@@ -151,7 +138,7 @@ func (service *HTTPRestService) updateIPConfigStateUnsafe(ipId string, updatedSt
 	return ipConfig, nil
 }
 
-// MarkIpsAsAvailableUntransacted will update pending programming IPs to available if NMAgent side's programmed nc version keep up with nc version.
+// MarkIpsAsAvailableUnsafe will update pending programming IPs to available if NMAgent side's programmed nc version keep up with nc version.
 // Note: this func is an untransacted API as the caller will take a Service lock
 func (service *HTTPRestService) MarkIpsAsAvailableUnsafe(ncID string, newHostNCVersion int) {
 	// Check whether it exist in service state and get the related nc info
