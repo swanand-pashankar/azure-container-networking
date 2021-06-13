@@ -9,23 +9,19 @@ import (
 )
 
 type PodNetworkInterfaceInfo struct {
-	PodName        string
-	PodNamespace   string
+	PodName       string
+	PodNamespace  string
 	PodEndpointId string
-	ContainerID    string
-	IPAddresses    []net.IPNet
+	ContainerID   string
+	IPAddresses   []net.IPNet
 }
 
-type CNIState interface {
-	PrintResult() error
-}
-
-type AzureCNIState struct {
+type State struct {
 	ContainerInterfaces map[string]PodNetworkInterfaceInfo
 }
 
-func (a *AzureCNIState) PrintResult() error {
-	b, err := json.MarshalIndent(a, "", "    ")
+func (s *State) WriteToStdout() error {
+	b, err := json.MarshalIndent(s, "", "    ")
 	if err != nil {
 		log.Errorf("Failed to unmarshall Azure CNI state, err:%v.\n", err)
 	}

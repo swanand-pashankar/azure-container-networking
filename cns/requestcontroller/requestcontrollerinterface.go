@@ -9,7 +9,7 @@ import (
 // RequestController interface for cns to interact with the request controller
 type RequestController interface {
 	InitRequestController() error
-	StartRequestController(exitChan <-chan struct{}) error
-	UpdateCRDSpec(cntxt context.Context, crdSpec nnc.NodeNetworkConfigSpec) error
+	StartRequestController(context.Context) error
+	UpdateCRDSpec(context.Context, nnc.NodeNetworkConfigSpec) error
 	IsStarted() bool
 }

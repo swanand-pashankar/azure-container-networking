@@ -109,21 +109,21 @@ func TestGetAllEndpointState(t *testing.T) {
 	state, err := plugin.GetAllEndpointState(networkid)
 	require.NoError(t, err)
 
-	res := &api.AzureCNIState{
+	res := &api.State{
 		ContainerInterfaces: map[string]api.PodNetworkInterfaceInfo{
 			ep1.Id: {
 				PodEndpointId: ep1.Id,
-				PodName:        ep1.PODName,
-				PodNamespace:   ep1.PODNameSpace,
-				ContainerID:    ep1.ContainerID,
-				IPAddresses:    ep1.IPAddresses,
+				PodName:       ep1.PODName,
+				PodNamespace:  ep1.PODNameSpace,
+				ContainerID:   ep1.ContainerID,
+				IPAddresses:   ep1.IPAddresses,
 			},
 			ep2.Id: {
 				PodEndpointId: ep2.Id,
-				PodName:        ep2.PODName,
-				PodNamespace:   ep2.PODNameSpace,
-				ContainerID:    ep2.ContainerID,
-				IPAddresses:    ep2.IPAddresses,
+				PodName:       ep2.PODName,
+				PodNamespace:  ep2.PODNameSpace,
+				ContainerID:   ep2.ContainerID,
+				IPAddresses:   ep2.IPAddresses,
 			},
 		},
 	}

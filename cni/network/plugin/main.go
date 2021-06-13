@@ -240,7 +240,7 @@ func main() {
 			return
 		}
 
-		err = simpleState.PrintResult()
+		err = simpleState.WriteToStdout()
 		if err != nil {
 			log.Errorf("Failed to print state result to stdout with err %v\n", err)
 		}

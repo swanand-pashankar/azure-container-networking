@@ -21,6 +21,7 @@ import (
 	"github.com/Azure/azure-container-networking/cnm/ipam"
 	"github.com/Azure/azure-container-networking/cnm/network"
 	"github.com/Azure/azure-container-networking/cns"
+	"github.com/Azure/azure-container-networking/cns/cni"
 	"github.com/Azure/azure-container-networking/cns/cnsclient"
 	"github.com/Azure/azure-container-networking/cns/common"
 	"github.com/Azure/azure-container-networking/cns/configuration"
@@ -339,6 +340,9 @@ func sendRegisterNodeRequest(
 
 // Main is the entry point for CNS.
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Initialize and parse command line arguments.
 	acn.ParseArgs(&args, printVersion)
 
@@ -352,6 +356,7 @@ func main() {
 	logDirectory := acn.GetArg(acn.OptLogLocation).(string)
 	ipamQueryUrl := acn.GetArg(acn.OptIpamQueryUrl).(string)
 	ipamQueryInterval := acn.GetArg(acn.OptIpamQueryInterval).(int)
+
 	startCNM := acn.GetArg(acn.OptStartAzureCNM).(bool)
 	vers := acn.GetArg(acn.OptVersion).(bool)
 	createDefaultExtNetworkType := acn.GetArg(acn.OptCreateDefaultExtNetworkType).(string)
@@ -404,6 +409,26 @@ func main() {
 
 	configuration.SetCNSConfigDefaults(&cnsconfig)
 	logger.Printf("[Azure CNS] Read config :%+v", cnsconfig)
+
+	// We might be configured to reinitialize state from the CNI instead of the apiserver.
+	// If so, we should check that the the CNI is new enough to support the state commands,
+	// otherwise we fall back to the existing behavior.
+	if cnsconfig.InitializeFromCNI {
+		goodVer, err := cni.IsDumpStateVer()
+		if err != nil {
+			logger.Errorf("error checking CNI ver: %v", err)
+			return
+		}
+
+		// override the prior config flag with the result of the ver check.
+		cnsconfig.InitializeFromCNI = goodVer
+
+		if cnsconfig.InitializeFromCNI {
+			// Set the PodInfoVersion by initialization type, so that the
+			// PodInfo maps use the correct key schema
+			cns.GlobalPodInfoVersion = cns.InterfaceIDPodInfoVersion
+		}
+	}
 
 	if cnsconfig.WireserverIP != "" {
 		nmagentclient.WireserverIP = cnsconfig.WireserverIP
@@ -506,9 +531,7 @@ func main() {
 	// Initialze state in if CNS is running in CRD mode
 	// State must be initialized before we start HTTPRestService
 	if config.ChannelMode == cns.CRD {
-		requestControllerStopChannel := make(chan struct{})
-		defer close(requestControllerStopChannel)
-		err = InitializeCRDState(httpRestService, cnsconfig, requestControllerStopChannel)
+		err = InitializeCRDState(ctx, httpRestService, cnsconfig)
 		if err != nil {
 			logger.Errorf("Failed to start CRD Controller, err:%v.\n", err)
 			return
@@ -518,9 +541,7 @@ func main() {
 	// Initialize multi-tenant controller if the CNS is running in MultiTenantCRD mode.
 	// It must be started before we start HTTPRestService.
 	if config.ChannelMode == cns.MultiTenantCRD {
-		multiTenantControllerStopChannel := make(chan struct{})
-		defer close(multiTenantControllerStopChannel)
-		err = InitializeMultiTenantController(httpRestService, cnsconfig, multiTenantControllerStopChannel)
+		err = InitializeMultiTenantController(ctx, httpRestService, cnsconfig)
 		if err != nil {
 			logger.Errorf("Failed to start multiTenantController, err:%v.\n", err)
 			return
@@ -689,7 +710,7 @@ func main() {
 	logger.Close()
 }
 
-func InitializeMultiTenantController(httpRestService cns.HTTPService, cnsconfig configuration.CNSConfig, exitChan <-chan struct{}) error {
+func InitializeMultiTenantController(ctx context.Context, httpRestService cns.HTTPService, cnsconfig configuration.CNSConfig) error {
 	var multiTenantController multitenantcontroller.MultiTenantController
 	kubeConfig, err := ctrl.GetConfig()
 	if err != nil {
@@ -720,7 +741,7 @@ func InitializeMultiTenantController(httpRestService cns.HTTPService, cnsconfig 
 	// Wait for multiTenantController to start.
 	go func() {
 		for {
-			if err := multiTenantController.StartMultiTenantController(exitChan); err != nil {
+			if err := multiTenantController.StartMultiTenantController(ctx); err != nil {
 				logger.Errorf("Failed to start multiTenantController: %v", err)
 			} else {
 				logger.Printf("Exiting multiTenantController")
@@ -761,7 +782,7 @@ func InitializeMultiTenantController(httpRestService cns.HTTPService, cnsconfig 
 }
 
 // initializeCRD state
-func InitializeCRDState(httpRestService cns.HTTPService, cnsconfig configuration.CNSConfig, exitChan <-chan struct{}) error {
+func InitializeCRDState(ctx context.Context, httpRestService cns.HTTPService, cnsconfig configuration.CNSConfig) error {
 	var requestController requestcontroller.RequestController
 
 	logger.Printf("[Azure CNS] Starting request controller")
@@ -787,7 +808,13 @@ func InitializeCRDState(httpRestService cns.HTTPService, cnsconfig configuration
 	httpRestServiceImplementation.SetNodeOrchestrator(&orchestrator)
 
 	// Get crd implementation of request controller
-	requestController, err = kubecontroller.NewCrdRequestController(httpRestServiceImplementation, kubeConfig)
+	requestController, err = kubecontroller.NewCrdRequestController(
+		ctx,
+		kubecontroller.Config{
+			InitializeFromCNI: cnsconfig.InitializeFromCNI,
+			KubeConfig:        kubeConfig,
+			Service:           httpRestServiceImplementation,
+		})
 	if err != nil {
 		logger.Errorf("[Azure CNS] Failed to make crd request controller :%v", err)
 		return err
@@ -805,7 +832,7 @@ func InitializeCRDState(httpRestService cns.HTTPService, cnsconfig configuration
 	//Start the RequestController which starts the reconcile loop
 	go func() {
 		for {
-			if err := requestController.StartRequestController(exitChan); err != nil {
+			if err := requestController.StartRequestController(ctx); err != nil {
 				logger.Errorf("[Azure CNS] Failed to start request controller: %v", err)
 				// retry to start the request controller
 				// todo: add a CNS metric to count # of failures
@@ -829,7 +856,6 @@ func InitializeCRDState(httpRestService cns.HTTPService, cnsconfig configuration
 		time.Sleep(time.Millisecond * 500)
 	}
 
-	ctx := context.Background()
 	logger.Printf("Starting IPAM Pool Monitor")
 	go func() {
 		for {
@@ -855,12 +881,10 @@ func InitializeCRDState(httpRestService cns.HTTPService, cnsconfig configuration
 			select {
 			case <-tickerChannel:
 				httpRestServiceImplementation.SyncHostNCVersion(rootCxt, cnsconfig.ChannelMode, cnsconfig.SyncHostNCTimeoutMs)
-            case <-rootCxt.Done():
-                return
+			case <-rootCxt.Done():
+				return
 			}
 		}
-
-		logger.Printf("[Azure CNS] Exiting SyncHostNCVersion")
 	}()
 
 	return nil
