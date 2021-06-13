@@ -4,6 +4,7 @@
 package logger
 
 import (
+	"context"
 	"reflect"
 	"regexp"
 	"time"
@@ -27,7 +28,7 @@ const (
 
 var codeRegex = regexp.MustCompile(`Code:(\w*)`)
 
-func SendHeartBeat(heartbeatIntervalInMins int, stopheartbeat chan bool) {
+func SendHeartBeat(ctx context.Context, heartbeatIntervalInMins int) {
 	heartbeat := time.NewTicker(time.Minute * time.Duration(heartbeatIntervalInMins)).C
 	metric := aitelemetry.Metric{
 		Name: HeartBeatMetricStr,
@@ -37,20 +38,21 @@ func SendHeartBeat(heartbeatIntervalInMins int, stopheartbeat chan bool) {
 	}
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-heartbeat:
 			SendMetric(metric)
-		case <-stopheartbeat:
-			return
 		}
 	}
 }
 
 // SendCnsTelemetry - handles cns telemetry reports
-func SendToTelemetryService(reports chan interface{}, telemetryStopProcessing chan bool) {
+func SendToTelemetryService(ctx context.Context, reports <-chan interface{}) {
 
 CONNECT:
 	tb := telemetry.NewTelemetryBuffer("")
 	tb.ConnectToTelemetryService(telemetryNumRetries, telemetryWaitTimeInMilliseconds)
+
 	if tb.Connected {
 
 		reportMgr := telemetry.ReportManager{
@@ -63,16 +65,15 @@ CONNECT:
 
 		for {
 			select {
+			case <-ctx.Done():
+				tb.Close()
+				return
 			case msg := <-reports:
 				codeStr := codeRegex.FindString(msg.(string))
 				if len(codeStr) > errorcodePrefix {
 					reflect.ValueOf(reportMgr.Report).Elem().FieldByName("Errorcode").SetString(codeStr[errorcodePrefix:])
 				}
-
 				reflect.ValueOf(reportMgr.Report).Elem().FieldByName("EventMessage").SetString(msg.(string))
-			case <-telemetryStopProcessing:
-				tb.Close()
-				return
 			}
 
 			reflect.ValueOf(reportMgr.Report).Elem().FieldByName("Timestamp").SetString(time.Now().UTC().String())
