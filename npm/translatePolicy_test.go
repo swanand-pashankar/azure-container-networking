@@ -3168,6 +3168,8 @@ func TestNamedPorts(t *testing.T) {
 				util.IptablesMatchSetFlag,
 				util.GetHashedName("app:server"),
 				util.IptablesDstFlag,
+				util.IptablesProtFlag,
+				"TCP",
 				util.IptablesModuleFlag,
 				util.IptablesSetModuleFlag,
 				util.IptablesMatchSetFlag,
